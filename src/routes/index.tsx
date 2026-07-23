@@ -8,6 +8,7 @@ import {
   flagUrl,
   pdfUrl,
 } from "@/lib/visa-data";
+import { PdfViewer } from "@/components/PdfViewer";
 
 export const Route = createFileRoute("/")({
   head: () => ({
