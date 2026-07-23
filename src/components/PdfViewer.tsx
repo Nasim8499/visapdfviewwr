@@ -31,7 +31,7 @@ export function PdfViewer({ url }: { url: string }) {
     (async () => {
       try {
         const pdfjs = await loadPdfjs();
-        const loadingTask = pdfjs.getDocument(url);
+        const loadingTask = pdfjs.getDocument({ url });
         const pdf = await loadingTask.promise;
         if (cancelled) return;
         setPages(pdf.numPages);
