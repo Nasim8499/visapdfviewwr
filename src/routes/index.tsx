@@ -28,6 +28,26 @@ export const Route = createFileRoute("/")({
   component: Dashboard,
 });
 
+async function downloadPdf(slug: string, doc: DocType) {
+  const url = pdfUrl(slug, doc);
+  const filename = `${slug}_${doc}.pdf`;
+  try {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(String(res.status));
+    const blob = await res.blob();
+    const objectUrl = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = objectUrl;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+  } catch {
+    window.open(url, "_blank", "noopener,noreferrer");
+  }
+}
+
 interface PreviewDoc {
   country: Country;
   doc: DocType;
@@ -259,14 +279,15 @@ function CountryCard({
             >
               Preview
             </button>
-            <a
-              href={pdfUrl(country.slug, d.key)}
-              download
+            <button
+              type="button"
+              onClick={() => downloadPdf(country.slug, d.key)}
               className="gradient-gold rounded-lg px-2.5 py-1.5 text-[0.7rem] font-bold tracking-wide text-white shadow-gold transition active:scale-95"
               aria-label={`Download ${d.label} for ${country.name}`}
             >
               PDF
-            </a>
+            </button>
+
           </li>
         ))}
       </ul>
@@ -284,6 +305,25 @@ function PreviewModal({
   const { country, doc } = preview;
   const url = pdfUrl(country.slug, doc);
   const label = DOC_TYPES.find((d) => d.key === doc)?.label ?? doc;
+  const filename = `${country.slug}_${doc}.pdf`;
+
+  async function handleDownload() {
+    try {
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const blob = await res.blob();
+      const objectUrl = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = objectUrl;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+    } catch {
+      window.open(url, "_blank", "noopener,noreferrer");
+    }
+  }
 
   return (
     <div
@@ -311,11 +351,19 @@ function PreviewModal({
           </div>
           <a
             href={url}
-            download
+            target="_blank"
+            rel="noreferrer"
+            className="hidden rounded-lg border border-border bg-muted px-3 py-2 text-xs font-bold tracking-wide text-navy sm:inline-block"
+          >
+            Open tab
+          </a>
+          <button
+            type="button"
+            onClick={handleDownload}
             className="gradient-gold hidden rounded-lg px-3 py-2 text-xs font-bold tracking-wide text-white shadow-gold sm:inline-block"
           >
             Download
-          </a>
+          </button>
           <button
             type="button"
             onClick={onClose}
@@ -329,25 +377,12 @@ function PreviewModal({
         </div>
 
         <div className="relative flex-1 bg-[#525659]">
-          <object
-            data={`${url}#view=FitH&toolbar=1&navpanes=0`}
-            type="application/pdf"
-            className="h-full w-full"
-          >
-            <div className="flex h-full flex-col items-center justify-center gap-4 p-6 text-center text-white">
-              <p className="text-sm opacity-80">
-                Your browser can't display this PDF inline. Tap below to open it.
-              </p>
-              <a
-                href={url}
-                target="_blank"
-                rel="noreferrer"
-                className="gradient-gold rounded-lg px-4 py-2 text-sm font-bold tracking-wide shadow-gold"
-              >
-                Open PDF
-              </a>
-            </div>
-          </object>
+          <iframe
+            key={url}
+            src={`${url}#view=FitH&toolbar=1&navpanes=0`}
+            title={`${country.name} ${label}`}
+            className="h-full w-full border-0"
+          />
         </div>
 
         <div className="flex gap-2 border-t border-border bg-card p-3 sm:hidden">
@@ -359,15 +394,16 @@ function PreviewModal({
           >
             Open
           </a>
-          <a
-            href={url}
-            download
+          <button
+            type="button"
+            onClick={handleDownload}
             className="gradient-gold flex-1 rounded-lg py-2.5 text-center text-sm font-bold tracking-wide text-white shadow-gold"
           >
             Download
-          </a>
+          </button>
         </div>
       </div>
     </div>
   );
 }
+
