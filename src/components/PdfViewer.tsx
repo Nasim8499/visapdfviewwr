@@ -1,16 +1,22 @@
 import { useEffect, useRef, useState } from "react";
 
-// pdf.js worker (Vite-friendly)
+// pdf.js worker (Vite-friendly, with CDN fallback)
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let pdfjsPromise: Promise<any> | null = null;
 async function loadPdfjs() {
   if (!pdfjsPromise) {
     pdfjsPromise = (async () => {
       const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
-      const workerUrl = (
-        await import("pdfjs-dist/legacy/build/pdf.worker.min.mjs?url")
-      ).default;
-      pdfjs.GlobalWorkerOptions.workerSrc = workerUrl;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const version = (pdfjs as any).version as string;
+      try {
+        const workerUrl = (
+          await import("pdfjs-dist/legacy/build/pdf.worker.min.mjs?url")
+        ).default;
+        pdfjs.GlobalWorkerOptions.workerSrc = workerUrl;
+      } catch {
+        pdfjs.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${version}/pdf.worker.min.mjs`;
+      }
       return pdfjs;
     })();
   }
@@ -89,15 +95,17 @@ export function PdfViewer({ url }: { url: string }) {
         </div>
       )}
       {status === "error" && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 p-6 text-center">
-          <p className="text-sm font-semibold text-white">
-            Couldn't render inline preview.
-          </p>
+        <div className="absolute inset-0 flex flex-col bg-[#525659]">
+          <iframe
+            src={url}
+            title="PDF preview"
+            className="h-full w-full flex-1 border-0 bg-white"
+          />
           <a
             href={url}
             target="_blank"
             rel="noreferrer"
-            className="gradient-gold rounded-lg px-4 py-2 text-xs font-bold text-white"
+            className="gradient-gold m-2 rounded-lg px-4 py-2 text-center text-xs font-bold text-white"
           >
             Open PDF in new tab
           </a>
