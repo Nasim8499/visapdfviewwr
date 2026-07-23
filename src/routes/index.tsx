@@ -28,6 +28,26 @@ export const Route = createFileRoute("/")({
   component: Dashboard,
 });
 
+async function downloadPdf(slug: string, doc: DocType) {
+  const url = pdfUrl(slug, doc);
+  const filename = `${slug}_${doc}.pdf`;
+  try {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(String(res.status));
+    const blob = await res.blob();
+    const objectUrl = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = objectUrl;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+  } catch {
+    window.open(url, "_blank", "noopener,noreferrer");
+  }
+}
+
 interface PreviewDoc {
   country: Country;
   doc: DocType;
