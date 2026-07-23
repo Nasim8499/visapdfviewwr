@@ -95,15 +95,17 @@ export function PdfViewer({ url }: { url: string }) {
         </div>
       )}
       {status === "error" && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 p-6 text-center">
-          <p className="text-sm font-semibold text-white">
-            Couldn't render inline preview.
-          </p>
+        <div className="absolute inset-0 flex flex-col bg-[#525659]">
+          <iframe
+            src={url}
+            title="PDF preview"
+            className="h-full w-full flex-1 border-0 bg-white"
+          />
           <a
             href={url}
             target="_blank"
             rel="noreferrer"
-            className="gradient-gold rounded-lg px-4 py-2 text-xs font-bold text-white"
+            className="gradient-gold m-2 rounded-lg px-4 py-2 text-center text-xs font-bold text-white"
           >
             Open PDF in new tab
           </a>
