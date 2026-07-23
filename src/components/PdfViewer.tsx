@@ -1,16 +1,22 @@
 import { useEffect, useRef, useState } from "react";
 
-// pdf.js worker (Vite-friendly)
+// pdf.js worker (Vite-friendly, with CDN fallback)
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let pdfjsPromise: Promise<any> | null = null;
 async function loadPdfjs() {
   if (!pdfjsPromise) {
     pdfjsPromise = (async () => {
       const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
-      const workerUrl = (
-        await import("pdfjs-dist/legacy/build/pdf.worker.min.mjs?url")
-      ).default;
-      pdfjs.GlobalWorkerOptions.workerSrc = workerUrl;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const version = (pdfjs as any).version as string;
+      try {
+        const workerUrl = (
+          await import("pdfjs-dist/legacy/build/pdf.worker.min.mjs?url")
+        ).default;
+        pdfjs.GlobalWorkerOptions.workerSrc = workerUrl;
+      } catch {
+        pdfjs.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${version}/pdf.worker.min.mjs`;
+      }
       return pdfjs;
     })();
   }
