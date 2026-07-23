@@ -377,14 +377,10 @@ function PreviewModal({
           </button>
         </div>
 
-        <div className="relative flex-1 bg-[#525659]">
-          <iframe
-            key={url}
-            src={`${url}#view=FitH&toolbar=1&navpanes=0`}
-            title={`${country.name} ${label}`}
-            className="h-full w-full border-0"
-          />
+        <div className="relative flex-1 overflow-hidden bg-[#525659]">
+          <PdfViewer url={url} />
         </div>
+
 
         <div className="flex gap-2 border-t border-border bg-card p-3 sm:hidden">
           <a
