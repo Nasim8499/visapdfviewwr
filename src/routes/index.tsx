@@ -259,14 +259,15 @@ function CountryCard({
             >
               Preview
             </button>
-            <a
-              href={pdfUrl(country.slug, d.key)}
-              download
+            <button
+              type="button"
+              onClick={() => downloadPdf(country.slug, d.key)}
               className="gradient-gold rounded-lg px-2.5 py-1.5 text-[0.7rem] font-bold tracking-wide text-white shadow-gold transition active:scale-95"
               aria-label={`Download ${d.label} for ${country.name}`}
             >
               PDF
-            </a>
+            </button>
+
           </li>
         ))}
       </ul>
