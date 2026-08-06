@@ -1,8 +1,26 @@
 import { useEffect, useRef, useState } from "react";
 
+type Diag = {
+  step: string;
+  url: string;
+  workerSrc: string;
+  workerMode: string;
+  pdfjsVersion: string;
+  userAgent: string;
+  httpStatus?: string;
+  contentType?: string;
+  bytes?: string;
+  magic?: string;
+  errorName?: string;
+  errorMessage?: string;
+  errorStack?: string;
+  timing: string[];
+};
+
 // pdf.js worker (Vite-friendly, with CDN fallback)
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let pdfjsPromise: Promise<any> | null = null;
+let workerMode = "unknown";
 async function loadPdfjs() {
   if (!pdfjsPromise) {
     pdfjsPromise = (async () => {
@@ -14,8 +32,10 @@ async function loadPdfjs() {
           await import("pdfjs-dist/legacy/build/pdf.worker.min.mjs?url")
         ).default;
         pdfjs.GlobalWorkerOptions.workerSrc = workerUrl;
-      } catch {
+        workerMode = "bundled";
+      } catch (e) {
         pdfjs.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${version}/pdf.worker.min.mjs`;
+        workerMode = `cdn-fallback (${(e as Error)?.message ?? "unknown"})`;
       }
       return pdfjs;
     })();
@@ -27,6 +47,9 @@ export function PdfViewer({ url }: { url: string }) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
   const [pages, setPages] = useState(0);
+  const [diag, setDiag] = useState<Diag | null>(null);
+  const [showDiag, setShowDiag] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -34,12 +57,63 @@ export function PdfViewer({ url }: { url: string }) {
     if (!container) return;
     container.innerHTML = "";
     setStatus("loading");
+    setDiag(null);
+    setShowDiag(false);
+
+    const t0 = performance.now();
+    const timing: string[] = [];
+    const mark = (label: string) =>
+      timing.push(`${label}: ${Math.round(performance.now() - t0)}ms`);
+
+    const d: Diag = {
+      step: "init",
+      url,
+      workerSrc: "",
+      workerMode: "pending",
+      pdfjsVersion: "",
+      userAgent: typeof navigator !== "undefined" ? navigator.userAgent : "n/a",
+      timing,
+    };
 
     (async () => {
       try {
+        d.step = "loading pdf.js module";
         const pdfjs = await loadPdfjs();
-        const loadingTask = pdfjs.getDocument({ url });
+        mark("pdfjs loaded");
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        d.pdfjsVersion = (pdfjs as any).version ?? "unknown";
+        d.workerSrc = String(pdfjs.GlobalWorkerOptions.workerSrc ?? "");
+        d.workerMode = workerMode;
+
+        // Probe the file itself so network/MIME failures are explicit.
+        d.step = "fetching PDF bytes";
+        let data: ArrayBuffer | undefined;
+        try {
+          const res = await fetch(url);
+          d.httpStatus = `${res.status} ${res.statusText}`;
+          d.contentType = res.headers.get("content-type") ?? "(none)";
+          if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText}`);
+          data = await res.arrayBuffer();
+          d.bytes = `${data.byteLength}`;
+          const head = new TextDecoder().decode(new Uint8Array(data.slice(0, 5)));
+          d.magic = JSON.stringify(head);
+          if (!head.startsWith("%PDF")) {
+            throw new Error(
+              `Response is not a PDF (starts with ${JSON.stringify(head)}, content-type ${d.contentType})`,
+            );
+          }
+          mark("bytes fetched");
+        } catch (fetchErr) {
+          d.step = "fetch failed";
+          throw fetchErr;
+        }
+
+        if (cancelled) return;
+
+        d.step = "parsing document";
+        const loadingTask = pdfjs.getDocument({ data });
         const pdf = await loadingTask.promise;
+        mark("document parsed");
         if (cancelled) return;
         setPages(pdf.numPages);
 
@@ -48,6 +122,7 @@ export function PdfViewer({ url }: { url: string }) {
 
         for (let i = 1; i <= pdf.numPages; i++) {
           if (cancelled) return;
+          d.step = `rendering page ${i}/${pdf.numPages}`;
           const page = await pdf.getPage(i);
           const baseViewport = page.getViewport({ scale: 1 });
           const scale = Math.max(0.5, containerWidth / baseViewport.width);
@@ -62,7 +137,7 @@ export function PdfViewer({ url }: { url: string }) {
             "mx-auto block rounded-md bg-white shadow-md ring-1 ring-black/10";
 
           const ctx = canvas.getContext("2d");
-          if (!ctx) continue;
+          if (!ctx) throw new Error("canvas 2d context unavailable on this device");
           ctx.scale(dpr, dpr);
 
           const wrap = document.createElement("div");
@@ -72,10 +147,19 @@ export function PdfViewer({ url }: { url: string }) {
 
           await page.render({ canvasContext: ctx, viewport, canvas }).promise;
         }
+        mark("all pages rendered");
         if (!cancelled) setStatus("ready");
       } catch (err) {
-        console.error("PDF render failed", err);
-        if (!cancelled) setStatus("error");
+        const e = err as Error & { name?: string };
+        d.errorName = e?.name ?? typeof err;
+        d.errorMessage = e?.message ?? String(err);
+        d.errorStack = (e?.stack ?? "").split("\n").slice(0, 6).join("\n");
+        mark("failed");
+        console.error("PDF render failed", { ...d, raw: err });
+        if (!cancelled) {
+          setDiag({ ...d });
+          setStatus("error");
+        }
       }
     })();
 
@@ -83,6 +167,22 @@ export function PdfViewer({ url }: { url: string }) {
       cancelled = true;
     };
   }, [url]);
+
+  function diagText(x: Diag) {
+    return [
+      `Failure step: ${x.step}`,
+      `Error: ${x.errorName}: ${x.errorMessage}`,
+      `URL: ${x.url}`,
+      `HTTP: ${x.httpStatus ?? "n/a"}`,
+      `Content-Type: ${x.contentType ?? "n/a"}`,
+      `Bytes: ${x.bytes ?? "n/a"}  Magic: ${x.magic ?? "n/a"}`,
+      `pdf.js: ${x.pdfjsVersion} (worker ${x.workerMode})`,
+      `Worker src: ${x.workerSrc}`,
+      `Timing: ${x.timing.join(" | ")}`,
+      `UA: ${x.userAgent}`,
+      `Stack:\n${x.errorStack ?? ""}`,
+    ].join("\n");
+  }
 
   return (
     <div className="relative h-full w-full overflow-auto bg-[#525659] px-2 py-3">
@@ -96,6 +196,42 @@ export function PdfViewer({ url }: { url: string }) {
       )}
       {status === "error" && (
         <div className="absolute inset-0 flex flex-col bg-[#525659]">
+          <div className="flex items-center gap-2 border-b border-white/10 bg-black/40 px-3 py-2">
+            <p className="min-w-0 flex-1 truncate text-[0.7rem] font-semibold text-white">
+              Couldn’t render — {diag?.errorName}: {diag?.errorMessage}
+            </p>
+            <button
+              type="button"
+              onClick={() => setShowDiag((v) => !v)}
+              className="shrink-0 rounded-md border border-white/25 px-2 py-1 text-[0.65rem] font-bold uppercase tracking-wide text-white"
+            >
+              {showDiag ? "Hide" : "Details"}
+            </button>
+          </div>
+
+          {showDiag && diag && (
+            <div className="max-h-[45%] overflow-auto bg-black/70 p-3">
+              <pre className="whitespace-pre-wrap break-all font-mono text-[0.62rem] leading-relaxed text-white/90">
+                {diagText(diag)}
+              </pre>
+              <button
+                type="button"
+                onClick={async () => {
+                  try {
+                    await navigator.clipboard.writeText(diagText(diag));
+                    setCopied(true);
+                    setTimeout(() => setCopied(false), 1500);
+                  } catch {
+                    setCopied(false);
+                  }
+                }}
+                className="mt-2 rounded-md border border-white/25 px-3 py-1.5 text-[0.65rem] font-bold uppercase tracking-wide text-white"
+              >
+                {copied ? "Copied" : "Copy diagnostics"}
+              </button>
+            </div>
+          )}
+
           <iframe
             src={url}
             title="PDF preview"
