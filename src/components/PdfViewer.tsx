@@ -1,5 +1,21 @@
 import { useEffect, useRef, useState } from "react";
 
+type Diag = {
+  step: string;
+  url: string;
+  workerSrc: string;
+  pdfjsVersion: string;
+  userAgent: string;
+  httpStatus?: string;
+  contentType?: string;
+  bytes?: string;
+  magic?: string;
+  errorName?: string;
+  errorMessage?: string;
+  errorStack?: string;
+  timing: string[];
+};
+
 // pdf.js worker (Vite-friendly, with CDN fallback)
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let pdfjsPromise: Promise<any> | null = null;
