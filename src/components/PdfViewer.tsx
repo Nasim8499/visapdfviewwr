@@ -47,9 +47,11 @@ export function PdfViewer({ url }: { url: string }) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
   const [pages, setPages] = useState(0);
+  const [failedPages, setFailedPages] = useState<number[]>([]);
   const [diag, setDiag] = useState<Diag | null>(null);
   const [showDiag, setShowDiag] = useState(false);
   const [copied, setCopied] = useState(false);
+
 
   useEffect(() => {
     let cancelled = false;
