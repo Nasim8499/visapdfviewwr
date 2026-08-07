@@ -59,6 +59,7 @@ export function PdfViewer({ url }: { url: string }) {
     if (!container) return;
     container.innerHTML = "";
     setStatus("loading");
+    setFailedPages([]);
     setDiag(null);
     setShowDiag(false);
 
