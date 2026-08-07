@@ -122,9 +122,8 @@ export function PdfViewer({ url }: { url: string }) {
         const containerWidth = container.clientWidth - 16; // padding allowance
         const dpr = Math.min(window.devicePixelRatio || 1, 2);
 
-        for (let i = 1; i <= pdf.numPages; i++) {
-          if (cancelled) return;
-          d.step = `rendering page ${i}/${pdf.numPages}`;
+        const renderPage = async (i: number, slot: HTMLDivElement) => {
+          slot.innerHTML = "";
           const page = await pdf.getPage(i);
           const baseViewport = page.getViewport({ scale: 1 });
           const scale = Math.max(0.5, containerWidth / baseViewport.width);
@@ -142,15 +141,70 @@ export function PdfViewer({ url }: { url: string }) {
           if (!ctx) throw new Error("canvas 2d context unavailable on this device");
           ctx.scale(dpr, dpr);
 
+          slot.appendChild(canvas);
+          await page.render({ canvasContext: ctx, viewport, canvas }).promise;
+        };
+
+        const showPageError = (i: number, slot: HTMLDivElement, err: unknown) => {
+          const e = err as Error;
+          console.error(`PDF page ${i} render failed`, {
+            page: i,
+            url,
+            pdfjsVersion: d.pdfjsVersion,
+            workerMode: d.workerMode,
+            errorName: e?.name ?? typeof err,
+            errorMessage: e?.message ?? String(err),
+            errorStack: (e?.stack ?? "").split("\n").slice(0, 6).join("\n"),
+            raw: err,
+          });
+
+          slot.innerHTML = "";
+          const box = document.createElement("div");
+          box.className =
+            "mx-auto flex w-full max-w-md flex-col items-center gap-2 rounded-md border border-dashed border-white/30 bg-black/30 p-5 text-center";
+          const title = document.createElement("p");
+          title.className = "text-xs font-semibold text-white";
+          title.textContent = `Page ${i} couldn’t be displayed`;
+          const sub = document.createElement("p");
+          sub.className = "text-[0.65rem] text-white/70";
+          sub.textContent =
+            "The rest of the document is fine — you can retry just this page.";
+          const btn = document.createElement("button");
+          btn.type = "button";
+          btn.className =
+            "mt-1 rounded-lg bg-white/15 px-3 py-1.5 text-[0.65rem] font-bold uppercase tracking-wide text-white";
+          btn.textContent = "Retry page";
+          btn.onclick = async () => {
+            btn.disabled = true;
+            btn.textContent = "Retrying…";
+            try {
+              await renderPage(i, slot);
+              setFailedPages((prev) => prev.filter((p) => p !== i));
+            } catch (retryErr) {
+              showPageError(i, slot, retryErr);
+            }
+          };
+          box.append(title, sub, btn);
+          slot.appendChild(box);
+          setFailedPages((prev) => (prev.includes(i) ? prev : [...prev, i].sort((a, b) => a - b)));
+        };
+
+        for (let i = 1; i <= pdf.numPages; i++) {
+          if (cancelled) return;
+          d.step = `rendering page ${i}/${pdf.numPages}`;
           const wrap = document.createElement("div");
           wrap.className = "mb-3 flex justify-center";
-          wrap.appendChild(canvas);
           container.appendChild(wrap);
-
-          await page.render({ canvasContext: ctx, viewport, canvas }).promise;
+          try {
+            await renderPage(i, wrap);
+          } catch (pageErr) {
+            if (cancelled) return;
+            showPageError(i, wrap, pageErr);
+          }
         }
         mark("all pages rendered");
         if (!cancelled) setStatus("ready");
+
       } catch (err) {
         const e = err as Error & { name?: string };
         d.errorName = e?.name ?? typeof err;
