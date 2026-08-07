@@ -47,9 +47,11 @@ export function PdfViewer({ url }: { url: string }) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
   const [pages, setPages] = useState(0);
+  const [failedPages, setFailedPages] = useState<number[]>([]);
   const [diag, setDiag] = useState<Diag | null>(null);
   const [showDiag, setShowDiag] = useState(false);
   const [copied, setCopied] = useState(false);
+
 
   useEffect(() => {
     let cancelled = false;
@@ -57,6 +59,7 @@ export function PdfViewer({ url }: { url: string }) {
     if (!container) return;
     container.innerHTML = "";
     setStatus("loading");
+    setFailedPages([]);
     setDiag(null);
     setShowDiag(false);
 
@@ -120,9 +123,8 @@ export function PdfViewer({ url }: { url: string }) {
         const containerWidth = container.clientWidth - 16; // padding allowance
         const dpr = Math.min(window.devicePixelRatio || 1, 2);
 
-        for (let i = 1; i <= pdf.numPages; i++) {
-          if (cancelled) return;
-          d.step = `rendering page ${i}/${pdf.numPages}`;
+        const renderPage = async (i: number, slot: HTMLDivElement) => {
+          slot.innerHTML = "";
           const page = await pdf.getPage(i);
           const baseViewport = page.getViewport({ scale: 1 });
           const scale = Math.max(0.5, containerWidth / baseViewport.width);
@@ -140,15 +142,70 @@ export function PdfViewer({ url }: { url: string }) {
           if (!ctx) throw new Error("canvas 2d context unavailable on this device");
           ctx.scale(dpr, dpr);
 
+          slot.appendChild(canvas);
+          await page.render({ canvasContext: ctx, viewport, canvas }).promise;
+        };
+
+        const showPageError = (i: number, slot: HTMLDivElement, err: unknown) => {
+          const e = err as Error;
+          console.error(`PDF page ${i} render failed`, {
+            page: i,
+            url,
+            pdfjsVersion: d.pdfjsVersion,
+            workerMode: d.workerMode,
+            errorName: e?.name ?? typeof err,
+            errorMessage: e?.message ?? String(err),
+            errorStack: (e?.stack ?? "").split("\n").slice(0, 6).join("\n"),
+            raw: err,
+          });
+
+          slot.innerHTML = "";
+          const box = document.createElement("div");
+          box.className =
+            "mx-auto flex w-full max-w-md flex-col items-center gap-2 rounded-md border border-dashed border-white/30 bg-black/30 p-5 text-center";
+          const title = document.createElement("p");
+          title.className = "text-xs font-semibold text-white";
+          title.textContent = `Page ${i} couldn’t be displayed`;
+          const sub = document.createElement("p");
+          sub.className = "text-[0.65rem] text-white/70";
+          sub.textContent =
+            "The rest of the document is fine — you can retry just this page.";
+          const btn = document.createElement("button");
+          btn.type = "button";
+          btn.className =
+            "mt-1 rounded-lg bg-white/15 px-3 py-1.5 text-[0.65rem] font-bold uppercase tracking-wide text-white";
+          btn.textContent = "Retry page";
+          btn.onclick = async () => {
+            btn.disabled = true;
+            btn.textContent = "Retrying…";
+            try {
+              await renderPage(i, slot);
+              setFailedPages((prev) => prev.filter((p) => p !== i));
+            } catch (retryErr) {
+              showPageError(i, slot, retryErr);
+            }
+          };
+          box.append(title, sub, btn);
+          slot.appendChild(box);
+          setFailedPages((prev) => (prev.includes(i) ? prev : [...prev, i].sort((a, b) => a - b)));
+        };
+
+        for (let i = 1; i <= pdf.numPages; i++) {
+          if (cancelled) return;
+          d.step = `rendering page ${i}/${pdf.numPages}`;
           const wrap = document.createElement("div");
           wrap.className = "mb-3 flex justify-center";
-          wrap.appendChild(canvas);
           container.appendChild(wrap);
-
-          await page.render({ canvasContext: ctx, viewport, canvas }).promise;
+          try {
+            await renderPage(i, wrap);
+          } catch (pageErr) {
+            if (cancelled) return;
+            showPageError(i, wrap, pageErr);
+          }
         }
         mark("all pages rendered");
         if (!cancelled) setStatus("ready");
+
       } catch (err) {
         const e = err as Error & { name?: string };
         d.errorName = e?.name ?? typeof err;
@@ -186,7 +243,27 @@ export function PdfViewer({ url }: { url: string }) {
 
   return (
     <div className="relative h-full w-full overflow-auto bg-[#525659] px-2 py-3">
+      {status === "ready" && failedPages.length > 0 && (
+        <div className="mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-amber-300/40 bg-amber-400/15 px-3 py-2">
+          <p className="min-w-0 flex-1 text-[0.7rem] font-semibold text-white">
+            {failedPages.length} of {pages} page{pages > 1 ? "s" : ""} couldn’t be
+            displayed (page {failedPages.join(", ")}). The rest of the document is ready.
+          </p>
+          <button
+            type="button"
+            onClick={() => {
+              containerRef.current
+                ?.querySelectorAll<HTMLButtonElement>("button")
+                .forEach((b) => !b.disabled && b.click());
+            }}
+            className="shrink-0 rounded-md bg-white/20 px-3 py-1.5 text-[0.65rem] font-bold uppercase tracking-wide text-white"
+          >
+            Retry failed pages
+          </button>
+        </div>
+      )}
       <div ref={containerRef} />
+
       {status === "loading" && (
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
           <div className="rounded-full bg-black/60 px-4 py-2 text-xs font-semibold text-white">
