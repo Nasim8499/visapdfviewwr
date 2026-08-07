@@ -243,7 +243,27 @@ export function PdfViewer({ url }: { url: string }) {
 
   return (
     <div className="relative h-full w-full overflow-auto bg-[#525659] px-2 py-3">
+      {status === "ready" && failedPages.length > 0 && (
+        <div className="mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-amber-300/40 bg-amber-400/15 px-3 py-2">
+          <p className="min-w-0 flex-1 text-[0.7rem] font-semibold text-white">
+            {failedPages.length} of {pages} page{pages > 1 ? "s" : ""} couldn’t be
+            displayed (page {failedPages.join(", ")}). The rest of the document is ready.
+          </p>
+          <button
+            type="button"
+            onClick={() => {
+              containerRef.current
+                ?.querySelectorAll<HTMLButtonElement>("button")
+                .forEach((b) => !b.disabled && b.click());
+            }}
+            className="shrink-0 rounded-md bg-white/20 px-3 py-1.5 text-[0.65rem] font-bold uppercase tracking-wide text-white"
+          >
+            Retry failed pages
+          </button>
+        </div>
+      )}
       <div ref={containerRef} />
+
       {status === "loading" && (
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
           <div className="rounded-full bg-black/60 px-4 py-2 text-xs font-semibold text-white">
