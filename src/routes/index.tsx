@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import {
   COUNTRIES,
@@ -196,11 +196,18 @@ function Dashboard() {
                 {t.l}
               </button>
             ) : (
+              t.l === "Chat" ? (
+                <Link key={t.l} to="/chat" className="flex flex-col items-center gap-1 py-1 text-muted-foreground">
+                  <Icon d={t.d} className="h-6 w-6" />
+                  {t.l}
+                </Link>
+              ) : (
               <button key={t.l} className={`flex flex-col items-center gap-1 py-1 ${t.active ? "font-semibold text-blue" : "text-muted-foreground"}`}>
                 <Icon d={t.d} className="h-6 w-6" />
                 {t.l}
                 {t.active && <span className="h-0.5 w-8 rounded bg-blue" />}
               </button>
+              )
             ),
           )}
         </div>
