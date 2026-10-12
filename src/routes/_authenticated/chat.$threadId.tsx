@@ -1,10 +1,11 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { supabase } from "@/integrations/supabase/client";
 import { useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import { COUNTRIES, DOC_TYPES, type Country, type DocType, flagUrl } from "@/lib/visa-data";
 import { PreviewModal, downloadPdf } from "@/components/PreviewModal";
 
-export const Route = createFileRoute("/chat")({
+export const Route = createFileRoute("/_authenticated/chat/$threadId")({
   head: () => ({
     meta: [
       { title: "ভিসা সহকারী চ্যাট — First Fly International" },
@@ -51,7 +52,20 @@ function parse(content: string) {
 }
 
 function ChatPage() {
+  const { threadId } = Route.useParams();
   const [messages, setMessages] = useState<Msg[]>([GREETING]);
+  const [loaded, setLoaded] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    setLoaded(false);
+    supabase.from("chat_messages").select("id,role,content").eq("thread_id", threadId).order("created_at").then(({ data, error }) => {
+      if (!alive) return;
+      if (error) console.error(error);
+      setMessages([GREETING, ...((data ?? []) as Msg[])]);
+      setLoaded(true);
+    });
+    return () => { alive = false; };
+  }, [threadId]);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
   const [preview, setPreview] = useState<{ country: Country; doc: DocType } | null>(null);
@@ -71,16 +85,21 @@ function ChatPage() {
     if (!q || busy) return;
     const user: Msg = { id: crypto.randomUUID(), role: "user", content: q };
     const botId = crypto.randomUUID();
-    const history = [...messages.filter((m) => m.id !== "hello"), user];
+    const history = [...messages.filter((m) => m.id !== "hello" && !m.error), user];
+    const isFirst = history.length === 1;
+    const { error: saveErr } = await supabase.from("chat_messages").insert({ thread_id: threadId, role: "user", content: q });
+    if (saveErr) console.error("save user msg", saveErr);
+    await supabase.from("chat_threads").update({ updated_at: new Date().toISOString(), ...(isFirst ? { title: q.slice(0, 60) } : {}) }).eq("id", threadId);
     setMessages((m) => [...m, user, { id: botId, role: "assistant", content: "" }]);
     setInput("");
     setBusy(true);
     const ac = new AbortController();
     abortRef.current = ac;
     try {
+      const { data: sess } = await supabase.auth.getSession();
       const res = await fetch("/api/chat", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${sess.session?.access_token ?? ""}` },
         body: JSON.stringify({ messages: history.map(({ role, content }) => ({ role, content })) }),
         signal: ac.signal,
       });
@@ -93,6 +112,10 @@ function ChatPage() {
         if (done) break;
         acc += dec.decode(value, { stream: true });
         setMessages((m) => m.map((x) => (x.id === botId ? { ...x, content: acc } : x)));
+      }
+      if (acc.trim() && !/\[\[ERR:/.test(acc)) {
+        const { error: e2 } = await supabase.from("chat_messages").insert({ thread_id: threadId, role: "assistant", content: acc });
+        if (e2) console.error("save assistant msg", e2);
       }
     } catch (e) {
       if ((e as Error).name !== "AbortError")
@@ -119,9 +142,9 @@ function ChatPage() {
               <span className="h-2 w-2 animate-pulse rounded-full bg-pass" /> {busy ? "লিখছে..." : "অনলাইন"}
             </p>
           </div>
-          <button onClick={() => { abortRef.current?.abort(); setMessages([GREETING]); }} className="rounded-full bg-muted px-3 py-1.5 text-xs font-semibold text-navy">
-            নতুন চ্যাট
-          </button>
+          <Link to="/chat" onClick={() => abortRef.current?.abort()} className="rounded-full bg-muted px-3 py-1.5 text-xs font-semibold text-navy">
+            সব চ্যাট
+          </Link>
         </header>
 
         <div className="flex-1 space-y-4 overflow-y-auto px-4 py-4">
@@ -172,7 +195,7 @@ function ChatPage() {
               </div>
             );
           })}
-          {messages.length === 1 && (
+          {loaded && messages.length === 1 && (
             <div className="flex flex-wrap gap-2 pl-9">
               {CHIPS.map((c) => (
                 <button key={c} onClick={() => send(c)} className="rounded-full border bg-card px-3 py-1.5 text-xs font-medium text-navy shadow-soft active:scale-95">
