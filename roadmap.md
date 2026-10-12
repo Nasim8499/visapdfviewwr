@@ -5,3 +5,7 @@
 - [x] Saved chat history (return to previous conversations)
 - [x] Security scan of chat assistant + fix findings
 - [ ] Browser automation agent (Browser Use Cloud) in chat — needs API key
+- [ ] Applicant cases: list with search + filters (applicant, visa type, status)
+- [ ] Case page: status timeline + upcoming milestones
+- [ ] Document upload + AI extraction / missing & inconsistent flags
+- [ ] Printable case summary PDF (details, status, document checklist)
