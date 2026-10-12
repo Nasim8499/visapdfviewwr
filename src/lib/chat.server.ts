@@ -14,13 +14,31 @@ const SYSTEM = `তুমি "ফার্স্ট ফ্লাই ভিসা
 উপলব্ধ ডকুমেন্ট (doc): ${DOC_TYPES.map((d) => `${d.label}=${d.key}`).join(", ")}
 তালিকার বাইরে কোনো slug/doc বানাবে না।`;
 
+async function verifyUser(request: Request) {
+  const token = request.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
+  const url = process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_PUBLISHABLE_KEY;
+  if (!token || !url || !key) return null;
+  const res = await fetch(`${url}/auth/v1/user`, { headers: { apikey: key, Authorization: `Bearer ${token}` } });
+  if (!res.ok) return null;
+  const u = (await res.json()) as { id?: string };
+  return u.id ?? null;
+}
+
 export async function handleChat(request: Request) {
   const apiKey = process.env.LOVABLE_API_KEY;
   if (!apiKey) return new Response("AI কনফিগার করা নেই।", { status: 500 });
+  const userId = await verifyUser(request);
+  if (!userId) return new Response("লগইন প্রয়োজন।", { status: 401 });
   let messages: ModelMessage[];
   try {
-    const body = (await request.json()) as { messages: { role: "user" | "assistant"; content: string }[] };
-    messages = body.messages.slice(-30).map((m) => ({ role: m.role, content: String(m.content).slice(0, 8000) }));
+    const body = (await request.json()) as { messages: { role: string; content: string }[] };
+    if (!Array.isArray(body.messages) || body.messages.length === 0) throw new Error("empty");
+    messages = body.messages
+      .slice(-30)
+      .filter((m) => m.role === "user" || m.role === "assistant")
+      .map((m) => ({ role: m.role as "user" | "assistant", content: String(m.content).slice(0, 8000) }));
+    if (messages.length === 0) throw new Error("empty");
   } catch {
     return new Response("ভুল অনুরোধ।", { status: 400 });
   }
