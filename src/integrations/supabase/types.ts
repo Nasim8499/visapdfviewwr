@@ -14,6 +14,104 @@ export type Database = {
   }
   public: {
     Tables: {
+      applicant_cases: {
+        Row: {
+          applicant_name: string
+          biometrics_on: string | null
+          country_slug: string
+          created_at: string
+          decision_expected_on: string | null
+          history: Json
+          id: string
+          notes: string | null
+          passport_no: string | null
+          status: string
+          submitted_on: string | null
+          updated_at: string
+          user_id: string
+          visa_type: string
+        }
+        Insert: {
+          applicant_name: string
+          biometrics_on?: string | null
+          country_slug: string
+          created_at?: string
+          decision_expected_on?: string | null
+          history?: Json
+          id?: string
+          notes?: string | null
+          passport_no?: string | null
+          status?: string
+          submitted_on?: string | null
+          updated_at?: string
+          user_id?: string
+          visa_type: string
+        }
+        Update: {
+          applicant_name?: string
+          biometrics_on?: string | null
+          country_slug?: string
+          created_at?: string
+          decision_expected_on?: string | null
+          history?: Json
+          id?: string
+          notes?: string | null
+          passport_no?: string | null
+          status?: string
+          submitted_on?: string | null
+          updated_at?: string
+          user_id?: string
+          visa_type?: string
+        }
+        Relationships: []
+      }
+      case_documents: {
+        Row: {
+          analysis: Json | null
+          analysis_status: string
+          case_id: string
+          created_at: string
+          doc_kind: string
+          file_name: string
+          id: string
+          mime_type: string
+          storage_path: string
+          user_id: string
+        }
+        Insert: {
+          analysis?: Json | null
+          analysis_status?: string
+          case_id: string
+          created_at?: string
+          doc_kind: string
+          file_name: string
+          id?: string
+          mime_type: string
+          storage_path: string
+          user_id?: string
+        }
+        Update: {
+          analysis?: Json | null
+          analysis_status?: string
+          case_id?: string
+          created_at?: string
+          doc_kind?: string
+          file_name?: string
+          id?: string
+          mime_type?: string
+          storage_path?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "case_documents_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "applicant_cases"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       chat_messages: {
         Row: {
           content: string
