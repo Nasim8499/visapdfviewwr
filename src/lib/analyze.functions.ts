@@ -41,7 +41,10 @@ export const analyzeDocument = createServerFn({ method: "POST" })
       await save({ analysis_status: "failed" });
       throw new Error("Could not read the uploaded file");
     }
-    const b64 = Buffer.from(await file.arrayBuffer()).toString("base64");
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    let bin = "";
+    for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+    const b64 = btoa(bin);
     const isPdf = doc.mime_type === "application/pdf";
     if (!isPdf && !doc.mime_type.startsWith("image/")) {
       await save({ analysis_status: "failed" });
