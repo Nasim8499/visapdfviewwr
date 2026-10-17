@@ -1,0 +1,1 @@
+ALTER TABLE public.applicant_cases ADD COLUMN IF NOT EXISTS date_of_birth date, ADD COLUMN IF NOT EXISTS nationality text;

@@ -20,9 +20,11 @@ export type Database = {
           biometrics_on: string | null
           country_slug: string
           created_at: string
+          date_of_birth: string | null
           decision_expected_on: string | null
           history: Json
           id: string
+          nationality: string | null
           notes: string | null
           passport_no: string | null
           status: string
@@ -36,9 +38,11 @@ export type Database = {
           biometrics_on?: string | null
           country_slug: string
           created_at?: string
+          date_of_birth?: string | null
           decision_expected_on?: string | null
           history?: Json
           id?: string
+          nationality?: string | null
           notes?: string | null
           passport_no?: string | null
           status?: string
@@ -52,9 +56,11 @@ export type Database = {
           biometrics_on?: string | null
           country_slug?: string
           created_at?: string
+          date_of_birth?: string | null
           decision_expected_on?: string | null
           history?: Json
           id?: string
+          nationality?: string | null
           notes?: string | null
           passport_no?: string | null
           status?: string
