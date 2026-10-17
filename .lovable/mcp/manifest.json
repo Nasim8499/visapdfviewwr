@@ -1,0 +1,168 @@
+{
+  "version": 1,
+  "sdk_version": "3.1.0",
+  "path": "/mcp",
+  "auth": {
+    "type": "oauth",
+    "issuer": "https://kpwcocyoyjxxirdjouct.supabase.co/auth/v1",
+    "accepted_audiences": [
+      "authenticated"
+    ]
+  },
+  "mcp": {
+    "server": {
+      "name": "mobile-app-master",
+      "version": "0.1.0",
+      "title": "Mobile App Master"
+    },
+    "tools": [
+      {
+        "name": "list_cases",
+        "title": "List applicant cases",
+        "description": "List your visa applicant cases, optionally filtered by status or a search term on applicant name / passport.",
+        "annotations": {
+          "readOnlyHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "status": {
+              "description": "Filter by case status, e.g. draft, submitted, approved.",
+              "type": "string"
+            },
+            "search": {
+              "description": "Match applicant name or passport number.",
+              "type": "string",
+              "maxLength": 80
+            }
+          },
+          "additionalProperties": false
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "get_case",
+        "title": "Get applicant case",
+        "description": "Get one applicant case with its status history and uploaded documents (including AI analysis results).",
+        "annotations": {
+          "readOnlyHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "case_id": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+              "description": "Case ID from list_cases."
+            }
+          },
+          "required": [
+            "case_id"
+          ],
+          "additionalProperties": false
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "create_case",
+        "title": "Create applicant case",
+        "description": "Open a new draft visa applicant case in your account.",
+        "annotations": {
+          "readOnlyHint": false,
+          "destructiveHint": false,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "applicant_name": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 120,
+              "description": "Full name as in passport."
+            },
+            "country_slug": {
+              "type": "string",
+              "enum": [
+                "Australia",
+                "Serbia",
+                "Singapore",
+                "Malaysia",
+                "Saudi_Arabia",
+                "Bahrain",
+                "United_Arab_Emirates",
+                "Kuwait",
+                "Estonia",
+                "Lithuania",
+                "Malta",
+                "Moldova",
+                "Montenegro",
+                "Morocco",
+                "New_Zealand"
+              ],
+              "description": "Destination country slug."
+            },
+            "visa_type": {
+              "type": "string",
+              "enum": [
+                "Work Visa",
+                "Work Permit",
+                "Visitor Visa",
+                "Sponsorship"
+              ],
+              "description": "Visa type."
+            },
+            "passport_no": {
+              "type": "string",
+              "maxLength": 30
+            },
+            "date_of_birth": {
+              "description": "YYYY-MM-DD",
+              "type": "string",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+            },
+            "nationality": {
+              "type": "string",
+              "maxLength": 60
+            }
+          },
+          "required": [
+            "applicant_name",
+            "country_slug",
+            "visa_type"
+          ],
+          "additionalProperties": false
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "list_visa_documents",
+        "title": "List visa PDF templates",
+        "description": "List the visa PDF documents available per destination country, with their download paths on this site.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "country": {
+              "description": "Country name or slug to filter, e.g. Malaysia.",
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        },
+        "outputSchema": null
+      }
+    ]
+  }
+}
