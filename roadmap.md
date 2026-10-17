@@ -9,3 +9,6 @@
 - [ ] Case page: status timeline + upcoming milestones
 - [ ] Document upload + AI extraction / missing & inconsistent flags
 - [ ] Printable case summary PDF (details, status, document checklist)
+- [ ] Link Home "+ New Applicant" to cases; verify cases flow builds
+- [ ] Passport/ID photo OCR auto-fill on new case form
+- [ ] Agent integrations (MCP server, OAuth)
