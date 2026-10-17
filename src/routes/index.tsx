@@ -189,12 +189,12 @@ function Dashboard() {
             { l: "Chat", d: I.chat },
           ].map((t) =>
             t.center ? (
-              <button key={t.l} className="flex flex-col items-center gap-1 text-muted-foreground">
+              <Link key={t.l} to="/cases/new" className="flex flex-col items-center gap-1 text-muted-foreground">
                 <span className="gradient-blue -mt-7 grid h-14 w-14 place-items-center rounded-full text-card shadow-glow">
                   <Icon d={t.d} className="h-7 w-7" />
                 </span>
                 {t.l}
-              </button>
+              </Link>
             ) : (
               t.l === "Chat" ? (
                 <Link key={t.l} to="/chat" className="flex flex-col items-center gap-1 py-1 text-muted-foreground">

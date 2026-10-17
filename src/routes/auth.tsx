@@ -2,8 +2,9 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable/index";
+import { oauthReturnPath } from "@/lib/oauth-return-path";
 
-const safeNext = (n: unknown) => (typeof n === "string" && n.startsWith("/") && !n.startsWith("//") ? n : "/chat");
+const safeNext = (n: unknown) => oauthReturnPath(n, "/chat");
 
 export const Route = createFileRoute("/auth")({
   validateSearch: (s: Record<string, unknown>) => ({ next: typeof s.next === "string" ? s.next : undefined }),
@@ -32,10 +33,10 @@ function AuthPage() {
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
-      if (data.session) navigate({ to: target });
+      if (data.session) navigate({ href: target });
     });
     const { data } = supabase.auth.onAuthStateChange((_e, s) => {
-      if (s) navigate({ to: target });
+      if (s) navigate({ href: target });
     });
     return () => data.subscription.unsubscribe();
   }, [navigate, target]);
@@ -51,7 +52,7 @@ function AuthPage() {
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
-        options: { emailRedirectTo: `${window.location.origin}${target}` },
+        options: { emailRedirectTo: new URL(target, window.location.origin).href },
       });
       if (error) setMsg(error.message);
       else if (!data.session) setMsg("আপনার ইমেইলে একটি নিশ্চিতকরণ লিংক পাঠানো হয়েছে।");

@@ -99,3 +99,49 @@ Today: ${new Date().toISOString().slice(0, 10)}`;
       );
     }
   });
+
+const PassportSchema = z.object({
+  full_name: z.string().nullable(),
+  passport_no: z.string().nullable(),
+  date_of_birth: z.string().nullable().describe("YYYY-MM-DD"),
+  nationality: z.string().nullable().describe("Country name in English"),
+  readable: z.boolean(),
+});
+export type PassportScan = z.infer<typeof PassportSchema>;
+
+export const scanPassport = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: { image: string; mediaType: string }) => {
+    if (typeof input?.image !== "string" || input.image.length > 9_000_000) throw new Error("Image too large (max ~6 MB)");
+    if (!/^image\/(jpeg|png|webp|heic|heif)$/.test(input.mediaType)) throw new Error("Please upload a JPG, PNG or WEBP photo");
+    return input;
+  })
+  .handler(async ({ data }) => {
+    const apiKey = process.env.LOVABLE_API_KEY;
+    if (!apiKey) throw new Error("AI is not configured");
+    const { createOpenAI } = await import("@ai-sdk/openai");
+    const { streamText, Output } = await import("ai");
+    const provider = createOpenAI({
+      baseURL: "https://ai.gateway.lovable.dev/v1",
+      apiKey,
+      headers: { "Lovable-API-Key": apiKey, "X-Lovable-AIG-SDK": "vercel-ai-sdk" },
+    });
+    const result = streamText({
+      model: provider.responses("openai/gpt-6-astra"),
+      system:
+        "You read passport / national ID photos. Extract the holder's full name (given names + surname, as printed), document number, date of birth (YYYY-MM-DD) and nationality (English country name). Use the MRZ to confirm values when visible. Return null for anything not clearly legible. Set readable=false if this is not an identity document. Never guess.",
+      messages: [{ role: "user", content: [{ type: "image", image: data.image, mediaType: data.mediaType }] }],
+      output: Output.object({ schema: PassportSchema }),
+      maxRetries: 0,
+      providerOptions: {
+        openai: { forceReasoning: true, reasoningEffort: "low", reasoningSummary: "auto", store: false, include: ["reasoning.encrypted_content"] },
+      },
+    });
+    try {
+      return { scan: await result.output };
+    } catch (e) {
+      const status = (e as { statusCode?: number }).statusCode;
+      console.error("scanPassport failed", status, (e as Error).message);
+      throw new Error(status === 429 ? "Too many requests — try again shortly." : status === 402 ? "AI credits exhausted." : "Could not read the document photo.");
+    }
+  });

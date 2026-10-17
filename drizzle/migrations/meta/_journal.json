@@ -15,6 +15,13 @@
       "when": 1791912423294,
       "tag": "0001_applicant_cases",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1792201404975,
+      "tag": "0002_case_dob_nationality",
+      "breakpoints": true
     }
   ]
 }
